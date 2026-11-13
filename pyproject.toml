@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "miscoshorts-ai"
+dynamic = ["version"]
+description = "Turn long YouTube videos into viral Shorts with AI: Whisper + Gemini or local LLMs + MoviePy."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Joaquín Ruiz" }]
+requires-python = ">=3.10"
+keywords = ["youtube", "shorts", "whisper", "gemini", "ollama", "moviepy", "video", "subtitles"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: Console",
+    "Topic :: Multimedia :: Video",
+]
+dependencies = [
+    "yt-dlp>=2025.1.1",
+    "moviepy>=2.1,<3",
+    "pillow>=10.1",
+    "numpy>=1.24",
+    "google-genai>=1.0",
+    "openai>=1.40",
+    "httpx>=0.27",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "openai-whisper>=20240930",
+]
+
+[project.optional-dependencies]
+faster = ["faster-whisper>=1.0"]
+smartcrop = ["opencv-python-headless>=4.8,<5"]
+all = ["miscoshorts-ai[faster,smartcrop]"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+miscoshorts = "miscoshorts.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/JoaquinRuiz/miscoshorts-ai"
+Tutorial = "https://youtu.be/zukJLVUwMxA"
+Issues = "https://github.com/JoaquinRuiz/miscoshorts-ai/issues"
+
+[tool.setuptools]
+packages = ["miscoshorts"]
+
+[tool.setuptools.dynamic]
+version = { attr = "miscoshorts.__version__" }
+
+[tool.setuptools.package-data]
+miscoshorts = ["assets/fonts/*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
