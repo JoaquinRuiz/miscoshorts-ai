@@ -108,7 +108,7 @@ cython_debug/
 .env.production.local
 *.key
 *.pem
-config.py
+/config.py
 
 # Model files (large)
 *.bin
