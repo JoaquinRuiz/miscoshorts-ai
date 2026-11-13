@@ -108,7 +108,7 @@ cython_debug/
 .env.production.local
 *.key
 *.pem
-config.py
+/config.py
 
 # Model files (large)
 *.bin
@@ -128,3 +128,6 @@ cache/
 *.bak
 *.backup
 *.old
+
+# Miscoshorts outputs
+short_con_subs*.json
