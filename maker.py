@@ -3,11 +3,10 @@ from moviepy import VideoFileClip
 import os
 import warnings
 import sys
-import re
 
 # own modules
-# Choose backend for cerebro (gemini or openai). Set CEREBRO_BACKEND env var to "gemini" or "openai".
-backend = os.getenv("CEREBRO_BACKEND", "openai").lower()
+# AI backend: "gemini" (default) or "openai" (any OpenAI-compatible API: Ollama, LM Studio, llama.cpp...).
+backend = os.getenv("CEREBRO_BACKEND", "gemini").lower()
 if backend == "gemini":
     import cerebro_gemini as cerebro
 elif backend == "openai":
@@ -22,8 +21,8 @@ warnings.filterwarnings("ignore")
 # URL can be passed as a command‑line argument:
 #   python3 maker.py "https://youtube.com/..."
 URL_VIDEO = sys.argv[1] if len(sys.argv) > 1 else "TU_URL_DE_VIDEO_AQUI"
-# Set to True to use the remote Whisper API, False to run locally with the whisper library.
-USE_WHISPER_API = os.getenv("USE_WHISPER_API", "true").lower() == "true"
+# Set USE_WHISPER_API=true to transcribe with a remote whisper-server instead of local Whisper.
+USE_WHISPER_API = os.getenv("USE_WHISPER_API", "false").lower() == "true"
 NOMBRE_SALIDA = "short_con_subs.mp4"
 
 def descargar_video(url):
@@ -49,15 +48,8 @@ def main():
     
     print("🔍 Transcribiendo audio para obtener tiempos...")
     resultado = subtitulos_whisper.transcribe_and_save(video_path, URL_VIDEO, use_api=USE_WHISPER_API)
-    
-    # Choose the appropriate input for the cerebro backend:
-    # - When using the remote Whisper API we only have raw text (or SRT) in the result.
-    # - When using the local Whisper library we have a list of segments.
-    if USE_WHISPER_API:
-        input_for_cerebro = resultado.get('srt') or resultado.get('text', '')
-    else:
-        input_for_cerebro = resultado.get('segments', [])
-    analisis = cerebro.encontrar_clip_viral(input_for_cerebro)
+
+    analisis = cerebro.encontrar_clip_viral(resultado['segments'])
     clip_data = parsear_respuesta_gemini(analisis)
 
     print(f"🤖 PROPUESTA DE SHORT:")
@@ -86,40 +78,7 @@ def main():
     new_width = h * (9/16)
     clip_vertical = clip.cropped(x1=w/2 - new_width/2, y1=0, x2=w/2 + new_width/2, y2=h)
 
-    # Prepare subtitle segments for generar_subtitulos
-    if USE_WHISPER_API:
-        # Parse SRT output into a list of segment dicts (start, end, text)
-        segments_for_subtitles = []
-        srt_text = resultado.get('srt', '')
-        if srt_text:
-            blocks = [b.strip() for b in srt_text.strip().split("\n\n") if b.strip()]
-            timestamp_pattern = re.compile(r"(\d{2}):(\d{2}):(\d{2}),(\d{3})")
-            for block in blocks:
-                lines = block.splitlines()
-                if len(lines) < 2:
-                    continue
-                # Expect timestamp line like "00:00:00,000 --> 00:00:03,600"
-                times = lines[1].split("-->")
-                if len(times) != 2:
-                    continue
-                start_match = timestamp_pattern.search(times[0].strip())
-                end_match = timestamp_pattern.search(times[1].strip())
-                if not (start_match and end_match):
-                    continue
-                sh, sm, ss, sms = map(int, start_match.groups())
-                eh, em, es, ems = map(int, end_match.groups())
-                start_sec = sh * 3600 + sm * 60 + ss + sms / 1000.0
-                end_sec = eh * 3600 + em * 60 + es + ems / 1000.0
-                text = " ".join(lines[2:]).strip()
-                segments_for_subtitles.append({
-                    "start": start_sec,
-                    "end": end_sec,
-                    "text": text
-                })
-    else:
-        segments_for_subtitles = resultado.get('segments', [])
-
-    clip_final = subtitulos.generar_subtitulos(clip_vertical, segments_for_subtitles, start)
+    clip_final = subtitulos.generar_subtitulos(clip_vertical, resultado['segments'], start)
     clip_final.write_videofile(NOMBRE_SALIDA, 
                                codec='libx264', 
                                audio_codec='aac', 

@@ -7,7 +7,7 @@ Automatically creates viral YouTube Shorts from long-form videos using AI analys
 
 - 🎥 Downloads YouTube videos automatically
 - 🔍 Transcribes audio using Whisper (local or OpenAI‑compatible API)
-- 🤖 Analyzes content with Google Gemini to find viral segments
+- 🤖 Analyzes content with Google Gemini or any OpenAI-compatible API (Ollama, LM Studio, llama.cpp) to find viral segments
 - ✂️ Crops videos to vertical 9:16 format for Shorts
 - 📝 Generates automatic subtitles with styling
 - 🎬 Creates ready-to-upload MP4 files
@@ -31,8 +31,6 @@ cd miscoshorts
 pip install -r requirements.txt
 ```
 
-> **Note:** The `cerebro_openai.py` backend works with any OpenAI‑compatible API (e.g., Ollama, LM Studio, llama.cpp). Set the `OPENAI_BASE_URL` environment variable to the appropriate endpoint (default `http://localhost:9090/v1`). Usually only the port changes (Ollama 11343, LM Studio 1234, llama‑cpp 8080).
-
 3. Install FFmpeg:
 ```bash
 # Ubuntu/Debian
@@ -49,26 +47,34 @@ brew install ffmpeg
    - Get an API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
    - Update the `GEMINI_API_KEY` variable in `cerebro_gemini.py`
 
-5. (Optional) Configure OpenAI‑compatible API backend:
-   - Set the `OPENAI_BASE_URL` environment variable to your API endpoint (default `http://localhost:9090/v1`).
-   - Example endpoints:
-     - Ollama: `http://localhost:11343/v1`
-     - LM Studio: `http://localhost:1234/v1`
-     - llama.cpp: `http://localhost:8080/v1`
-   - If using the remote Whisper server, ensure `USE_WHISPER_API=true` and adjust `api_url` in `subtitulos_whisper.py`.
+5. (Optional) Run fully local instead of Gemini + local Whisper. Everything is configured with environment variables:
+
+   | Variable | Default | Purpose |
+   |---|---|---|
+   | `CEREBRO_BACKEND` | `gemini` | `openai` to use any OpenAI-compatible API (Ollama, LM Studio, llama.cpp...) |
+   | `OPENAI_BASE_URL` | `http://localhost:11434/v1` | API endpoint. Ollama `11434`, LM Studio `1234`, llama.cpp `8080` |
+   | `OPENAI_MODEL` | `qwen3:30b` | Model name as your server exposes it |
+   | `OPENAI_API_KEY` | `none` | Only needed if your server requires one |
+   | `USE_WHISPER_API` | `false` | `true` to transcribe with a remote whisper.cpp `whisper-server` |
+   | `WHISPER_API_URL` | `http://localhost:9191/inference` | whisper-server endpoint |
+
+   Example:
+   ```bash
+   CEREBRO_BACKEND=openai OPENAI_MODEL=qwen3:30b USE_WHISPER_API=true \
+     python maker.py "https://www.youtube.com/watch?v=VIDEO_ID"
+   ```
 
 ## Usage
 
-1. Edit the `URL_VIDEO` variable in `maker.py` to point to your target YouTube video
-2. Run the script:
+1. Run the script with the YouTube URL (or edit `URL_VIDEO` in `maker.py`):
 ```bash
-python maker.py
+python maker.py "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
 3. The script will:
    - Download the video
    - Transcribe the audio
-   - Ask Gemini to suggest the best viral segment
+   - Ask the AI (Gemini by default) to suggest the best viral segment
    - Show you the suggestion with title, timestamps, and reasoning
    - Ask for confirmation (press 's' to accept or provide custom timestamps)
    - Generate the vertical Short with subtitles
@@ -123,7 +129,7 @@ pip uninstall whisper
 pip install openai-whisper
 ```
 
-> **Tip:** To use a remote Whisper server, set `USE_WHISPER_API=true` (default) and point `api_url` in `subtitulos_whisper.py` to the server’s endpoint (e.g., `http://localhost:9191/inference`). The server should return SRT compatible with the script.
+> **Tip:** To use a remote whisper.cpp server, set `USE_WHISPER_API=true` and `WHISPER_API_URL` (e.g. `http://localhost:9191/inference`). The audio is extracted to 16 kHz WAV with ffmpeg before uploading, and the server must support `response_format=srt`.
 
 ### Gemini API Issues
 - Make sure your API key is valid
@@ -136,6 +142,8 @@ pip install openai-whisper
 miscoshorts/
 ├── maker.py              # Main script
 ├── cerebro_gemini.py     # Gemini AI analysis
+├── cerebro_openai.py     # OpenAI-compatible AI analysis (Ollama, LM Studio, llama.cpp)
+├── subtitulos_whisper.py # Transcription (local Whisper or whisper-server API)
 ├── subtitulos.py         # Subtitle generation
 ├── requirements.txt      # Python dependencies
 ├── README.md            # This file

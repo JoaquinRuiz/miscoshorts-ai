@@ -1,67 +1,103 @@
+import os
+import re
+import subprocess
+import tempfile
+
 import requests
-import json
 
-def transcribe_and_save(
-    video_path: str,
-    url_video: str,
-    use_api: bool = True,
-    api_url: str = "http://localhost:9191/inference",
-    srt_output: bool = True,
-):
+# Endpoint of a whisper.cpp `whisper-server` (or compatible) instance.
+WHISPER_API_URL = os.getenv("WHISPER_API_URL", "http://localhost:9191/inference")
+
+_SRT_TIME = re.compile(r"(\d{2}):(\d{2}):(\d{2})[,.](\d{3})")
+
+
+def _srt_time_to_seconds(match):
+    h, m, s, ms = map(int, match.groups())
+    return h * 3600 + m * 60 + s + ms / 1000.0
+
+
+def parse_srt(srt_text):
+    """Parse SRT text into Whisper-style segments: [{"start", "end", "text"}]."""
+    segments = []
+    blocks = re.split(r"\r?\n\s*\r?\n", srt_text.strip())
+    for block in blocks:
+        lines = block.strip().splitlines()
+        # Find the "00:00:00,000 --> 00:00:03,600" line (usually the 2nd one).
+        for i, line in enumerate(lines):
+            if "-->" in line:
+                start_str, end_str = line.split("-->", 1)
+                start_m = _SRT_TIME.search(start_str)
+                end_m = _SRT_TIME.search(end_str)
+                if start_m and end_m:
+                    segments.append({
+                        "start": _srt_time_to_seconds(start_m),
+                        "end": _srt_time_to_seconds(end_m),
+                        "text": " ".join(lines[i + 1:]).strip(),
+                    })
+                break
+    return segments
+
+
+def _extract_audio(video_path):
+    """Extract 16 kHz mono WAV (the format whisper.cpp expects) using ffmpeg."""
+    fd, wav_path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", video_path,
+         "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav_path],
+        check=True,
+    )
+    return wav_path
+
+
+def _transcribe_api(video_path, api_url):
+    wav_path = _extract_audio(video_path)
+    try:
+        with open(wav_path, "rb") as f:
+            response = requests.post(
+                api_url,
+                files={"file": ("audio.wav", f, "audio/wav")},
+                data={"response_format": "srt"},
+                timeout=3600,
+            )
+        response.raise_for_status()
+    finally:
+        os.remove(wav_path)
+
+    segments = parse_srt(response.text)
+    if not segments:
+        raise RuntimeError(
+            f"Whisper API at {api_url} returned no parseable SRT segments. "
+            f"Response starts with: {response.text[:200]!r}"
+        )
+    return {
+        "text": " ".join(seg["text"] for seg in segments),
+        "segments": segments,
+    }
+
+
+def _transcribe_local(video_path):
+    import whisper
+    model = whisper.load_model("base")
+    return model.transcribe(video_path)
+
+
+def transcribe_and_save(video_path, url_video, use_api=False, api_url=WHISPER_API_URL):
     """
-    Transcribe the audio of the given video using either the local Whisper model
-    or a remote Whisper API.
+    Transcribe a video with local Whisper (default) or a remote whisper-server.
 
-    Parameters
-    ----------
-    video_path: str
-        Path to the local video file.
-    url_video: str
-        Original video URL (used only for logging in the output file).
-    use_api: bool, optional
-        If True, send the video to a remote Whisper inference server.
-        If False (default), use the local ``whisper`` library.
-    api_url: str, optional
-        URL of the remote Whisper inference endpoint.
-
-    Returns
-    -------
-    dict
-        Whisper‑style transcription result dictionary containing at least
-        ``text`` and optionally ``segments``.
+    Always returns a Whisper-style dict with ``text`` and ``segments``
+    (each segment has ``start``, ``end`` and ``text``), so every cerebro
+    backend and the subtitle generator work the same regardless of the source.
+    Also writes the full transcription to ``transcripcion_completa.txt``.
     """
     if use_api:
-        # Remote transcription via HTTP POST
-        with open(video_path, "rb") as f:
-            files = {"file": (video_path, f, "application/octet-stream")}
-            # Request SRT format if requested, otherwise default JSON
-            params = {"response_format": "srt"} if srt_output else {}
-            response = requests.post(api_url, files=files, data=params, timeout=3600)
-            response.raise_for_status()
-            if srt_output:
-                # Return raw SRT text; callers can parse if needed
-                result = {"srt": response.text}
-            else:
-                # Assume the remote service returns JSON compatible with Whisper output
-                try:
-                    result = response.json()
-                except ValueError:
-                    # Fallback: treat raw text as the transcription
-                    result = {"text": response.text, "segments": []}
+        result = _transcribe_api(video_path, api_url)
     else:
-        # Local transcription using the Whisper library
-        import whisper
-        model = whisper.load_model("base")
-        result = model.transcribe(video_path)
+        result = _transcribe_local(video_path)
 
-    # Save the full transcription to a text file (same format as before)
-    # Save the full transcription (or SRT) to a text file
     with open("transcripcion_completa.txt", "w", encoding="utf-8") as f:
         f.write(f"URL: {url_video}\n")
-        if srt_output and "srt" in result:
-            f.write(result["srt"])
-        else:
-            f.write(result.get("text", ""))
-
+        f.write(result["text"])
 
     return result
