@@ -7,6 +7,7 @@
 [![Python](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](#requirements)
 [![MoviePy v2](https://img.shields.io/badge/MoviePy-v2-blue)](https://zulko.github.io/moviepy/)
 [![Runs locally](https://img.shields.io/badge/runs-100%25%20local%20(optional)-orange)](#run-it-100-local)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/JoaquinRuiz/miscoshorts-ai?style=flat&logo=github)](https://github.com/JoaquinRuiz/miscoshorts-ai/stargazers)
 
 [![Gemini](https://img.shields.io/badge/Gemini-8E75B2?logo=googlegemini&logoColor=white)](#configuration)
@@ -191,7 +192,7 @@ Miscoshorts asks for `response_format=srt` and fails with the first characters o
 
 ## Contributing
 
-Issues and pull requests are welcome. Thanks to [@Jay4242](https://github.com/Jay4242) for the OpenAI-compatible and whisper-server backends.
+Issues and pull requests are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) first. Thanks to [@Jay4242](https://github.com/Jay4242) for the OpenAI-compatible and whisper-server backends.
 
 ## Author
 
@@ -207,3 +208,7 @@ If this code helped you, understanding the logic behind the AI is what will set 
 | 🔭 [Explora la Inteligencia Artificial](https://amzn.eu/d/dSwYhue) | The big picture of today's AI ecosystem |
 
 [![All books on Amazon](https://img.shields.io/badge/All%20books%20on%20Amazon-FF9900?style=for-the-badge&logo=amazon&logoColor=white)](https://www.amazon.es/stores/Joaqu%C3%ADn-Ruiz/author/B0DW43DPSF)
+
+## License
+
+[MIT](LICENSE)
