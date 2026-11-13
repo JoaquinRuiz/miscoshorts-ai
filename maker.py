@@ -1,16 +1,28 @@
 import yt_dlp
 from moviepy import VideoFileClip
 import os
-import whisper
 import warnings
+import sys
 
 # own modules
-import cerebro_gemini as cerebro
+# AI backend: "gemini" (default) or "openai" (any OpenAI-compatible API: Ollama, LM Studio, llama.cpp...).
+backend = os.getenv("CEREBRO_BACKEND", "gemini").lower()
+if backend == "gemini":
+    import cerebro_gemini as cerebro
+elif backend == "openai":
+    import cerebro_openai as cerebro
+else:
+    raise ValueError(f"Unsupported CEREBRO_BACKEND: {backend}")
 import subtitulos
+import subtitulos_whisper
 
 warnings.filterwarnings("ignore")
 
-URL_VIDEO = "TU_URL_DE_VIDEO_AQUI" 
+# URL can be passed as a command‑line argument:
+#   python3 maker.py "https://youtube.com/..."
+URL_VIDEO = sys.argv[1] if len(sys.argv) > 1 else "TU_URL_DE_VIDEO_AQUI"
+# Set USE_WHISPER_API=true to transcribe with a remote whisper-server instead of local Whisper.
+USE_WHISPER_API = os.getenv("USE_WHISPER_API", "false").lower() == "true"
 NOMBRE_SALIDA = "short_con_subs.mp4"
 
 def descargar_video(url):
@@ -35,12 +47,8 @@ def main():
     video_path = descargar_video(URL_VIDEO)
     
     print("🔍 Transcribiendo audio para obtener tiempos...")
-    model = whisper.load_model("base")
-    resultado = model.transcribe(video_path)
-    with open("transcripcion_completa.txt", "w", encoding="utf-8") as f:
-        f.write(f"URL: {URL_VIDEO}\n")
-        f.write(resultado['text'])  
-    
+    resultado = subtitulos_whisper.transcribe_and_save(video_path, URL_VIDEO, use_api=USE_WHISPER_API)
+
     analisis = cerebro.encontrar_clip_viral(resultado['segments'])
     clip_data = parsear_respuesta_gemini(analisis)
 
@@ -69,7 +77,7 @@ def main():
     w, h = clip.size
     new_width = h * (9/16)
     clip_vertical = clip.cropped(x1=w/2 - new_width/2, y1=0, x2=w/2 + new_width/2, y2=h)
-    
+
     clip_final = subtitulos.generar_subtitulos(clip_vertical, resultado['segments'], start)
     clip_final.write_videofile(NOMBRE_SALIDA, 
                                codec='libx264', 

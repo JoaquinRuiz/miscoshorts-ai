@@ -2,3 +2,5 @@ yt-dlp
 moviepy
 google-generativeai
 openai-whisper
+openai
+requests
